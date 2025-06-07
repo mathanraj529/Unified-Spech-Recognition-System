@@ -1,0 +1,51 @@
+!pip install SpeechRecognition pydub
+
+
+from google.colab import files
+uploaded = files.upload()
+
+filename = list(uploaded.keys())[0]
+
+
+import speech_recognition as sr
+from pydub import AudioSegment
+from pydub.utils import make_chunks
+import os
+import IPython.display as ipd
+
+# Load audio
+audio = AudioSegment.from_wav(filename)
+chunk_length_ms = 5000  # 5 seconds per subtitle
+chunks = make_chunks(audio, chunk_length_ms)
+
+# Save chunks and recognize each one
+r = sr.Recognizer()
+subtitle_output = []
+
+print("⏱️ Generating subtitles...\n")
+for i, chunk in enumerate(chunks):
+    chunk_filename = f"chunk{i}.wav"
+    chunk.export(chunk_filename, format="wav")
+    
+    with sr.AudioFile(chunk_filename) as source:
+        audio_data = r.record(source)
+        try:
+            text = r.recognize_google(audio_data)
+        except sr.UnknownValueError:
+            text = "[Unclear audio]"
+        except sr.RequestError as e:
+            text = f"[Error: {e}]"
+    
+    timestamp = f"[{(i * 5):02d}s - {(i * 5 + 5):02d}s]"
+    subtitle_output.append(f"{timestamp}: {text}")
+    os.remove(chunk_filename)
+
+# Display subtitles
+for line in subtitle_output:
+    print(line)
+
+# Optional: Save subtitles to a file
+with open("subtitles.txt", "w") as f:
+    f.write("\n".join(subtitle_output))
+
+files.download("subtitles.txt")

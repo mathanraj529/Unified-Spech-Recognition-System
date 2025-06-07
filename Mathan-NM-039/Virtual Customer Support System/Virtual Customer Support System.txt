@@ -1,0 +1,144 @@
+import speech_recognition as sr
+import pandas as pd
+
+# Load dataset from the CSV file
+def load_support_data(file_path='customer_support_data.csv'):
+    """Loads customer support data from a CSV file."""
+    try:
+        data = pd.read_csv(file_path)
+        support_data = []
+        for _, row in data.iterrows():
+            # Split keywords by semicolon and convert to lowercase
+            keywords = [kw.strip().lower() for kw in row['keywords'].split(';') if kw.strip()]
+            support_data.append({
+                'intent': row['intent'],
+                'keywords': keywords,
+                'response': row['response']
+            })
+        print(f"Successfully loaded data from {file_path}")
+        # print("Loaded data sample:", support_data[:2]) # Optional: print a sample
+        return support_data
+    except FileNotFoundError:
+        print(f"Error: Dataset file not found at {file_path}")
+        return []
+    except Exception as e:
+        print(f"Error loading data: {e}")
+        return []
+
+
+# Recognize speech from the microphone
+def recognize_speech():
+    """Listens to the microphone and returns the recognized text."""
+    recognizer = sr.Recognizer()
+    # sr.Microphone() might cause issues in environments without direct audio device access
+    # If using Colab or similar, you might need to process pre-recorded audio files
+    try:
+        with sr.Microphone() as source:
+            print("🎤 Listening...")
+            # Adjust for ambient noise to improve recognition accuracy
+            recognizer.adjust_for_ambient_noise(source, duration=5) # listen for 5 seconds to calibrate
+            print("Say something!")
+            audio = recognizer.listen(source, timeout=10, phrase_time_limit=10) # Listen for up to 10 seconds
+
+        print("🧠 Transcribing...")
+        # Use Google's web speech API for recognition
+        # Requires internet connection
+        text = recognizer.recognize_google(audio)
+        print("🗣️ You said:", text)
+        return text.lower() # Return transcribed text in lowercase
+    except sr.UnknownValueError:
+        print("❌ Could not understand audio. Please try again.")
+    except sr.RequestError as e:
+        print(f"⚠️ Could not request results from Google Speech Recognition service; {e}")
+    except Exception as e:
+        print(f"An error occurred during speech recognition: {e}")
+
+    return "" # Return empty string if recognition fails
+
+
+# Match user input against the dataset keywords
+def get_response(user_input, support_data):
+    """Finds a matching response based on user input and support data."""
+    if not user_input:
+        return "🤖 Sorry, I didn't hear anything or could not understand. Could you please speak?"
+
+    # Iterate through each item in the support data
+    for item in support_data:
+        # Check if any keyword for this intent is present in the user's input
+        for keyword in item.get('keywords', []): # Use .get() for safety
+             # Case-insensitive check
+            if keyword in user_input:
+                print(f"(Matched keyword: '{keyword}' for intent '{item['intent']}')") # Optional: show match info
+                return item['response'] # Return the corresponding response
+
+    # If no keywords matched
+    return "🤖 Sorry, I didn't catch that. Could you rephrase or ask about a different topic?"
+
+
+# Main function to run the virtual support system
+def virtual_support_system(data_file='customer_support_data.csv'):
+    """Runs the virtual customer support system."""
+    print("Starting Virtual Support System...")
+    support_data = load_support_data(data_file)
+
+    if not support_data:
+        print("Cannot proceed without support data.")
+        return
+
+    print("\nReady to listen. Say 'goodbye' to exit.")
+
+    while True:
+        user_input = recognize_speech()
+
+        if user_input:
+            # Check if the user wants to exit
+            if 'goodbye' in user_input:
+                print("🤖 Virtual Assistant: Goodbye!")
+                break
+
+            response = get_response(user_input, support_data)
+            print("🤖 Virtual Assistant:", response)
+        else:
+            # If recognition failed, offer help or suggest retrying
+             print("🤖 Virtual Assistant: Could you please repeat that?")
+
+        print("-" * 20) # Separator for next interaction
+
+# Entry point for the script
+if __name__ == "__main__":
+    # Ensure the dummy data file exists before running the system
+    # (This part is handled by the first cell, but added here for clarity if run as a single script)
+    # Create a dummy CSV if it doesn't exist (useful if running this cell standalone)
+    try:
+        with open('customer_support_data.csv', 'r') as f:
+            pass # File exists
+    except FileNotFoundError:
+        print("Creating dummy data file...")
+        data = {
+            'intent': [
+                'greeting', 'product_inquiry', 'order_status', 'return_policy',
+                'technical_support', 'payment_issue', 'hours', 'contact', 'goodbye'
+            ],
+            'keywords': [
+                'hello;hi;hey', 'product;item;stock;available', 'order status;track order;where is my order',
+                'return;refund;exchange', 'technical issue;error;bug;problem', 'payment;billing;charge',
+                'hours;open;close', 'contact;call;email;phone', 'bye;goodbye;see you'
+            ],
+            'response': [
+                'Hello! How can I assist you today?',
+                'What product are you interested in?',
+                'Please provide your order number to check the status.',
+                'You can return items within 30 days of purchase with a receipt.',
+                'Could you please describe the technical issue you are facing?',
+                'Can you tell me more about the payment issue you are experiencing?',
+                'Our operating hours are Monday to Friday, 9 AM to 5 PM.',
+                'You can reach us at support@example.com or call us during business hours.',
+                'Goodbye! Have a great day.'
+            ]
+        }
+        df = pd.DataFrame(data)
+        df.to_csv('customer_support_data.csv', index=False)
+        print("Dummy dataset 'customer_support_data.csv' created.")
+
+
+    virtual_support_system()
